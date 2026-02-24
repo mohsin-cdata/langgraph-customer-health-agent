@@ -2,70 +2,47 @@
 
 [![Python 3.8+](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/downloads/)
 [![License MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2%2B-orange)](https://langchain-ai.github.io/langgraph/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-0.3%2B-orange)](https://langchain-ai.github.io/langgraph/)
 [![CData](https://img.shields.io/badge/CData-Connect%20AI-1a73e8)](https://www.cdata.com/ai/)
 
-Build intelligent customer health analysis applications that query live enterprise data, analyze account health, and generate executive briefs using **LangGraph** + **CData Connect AI**.
+Build intelligent customer health analysis agents that autonomously discover data schemas, query live enterprise data, and generate executive health briefs using **LangGraph** + **CData Connect AI**.
 
 > **NOTE:** While this guide uses Google Sheets as the data source, the same principles apply to any of the [350+ data sources](https://www.cdata.com/ai/) CData Connect AI supports.
-
-## What You Can Do
-
-- Connect to 350+ enterprise data sources through CData Connect AI
-- Analyze customer health using a 4-node LangGraph workflow
-- Ask questions in plain English and get instant SQL + insights
-- Generate beautiful HTML briefs with embedded styling
-- Switch between data sources (Google Sheets / Salesforce) with zero code changes
 
 ## Architecture
 
 ```mermaid
-graph LR
-    A[CLI Input] --> B{Query Mode}
-    B -->|--account| C[LangGraph 4-Node Workflow]
-    B -->|--nlquery| D[LLM: NL to SQL]
-    B -->|--query| E[Direct SQL]
-    C & D & E --> F[CData Connect AI MCP]
-    F --> G[Google Sheets / Salesforce / 350+]
-    C --> H[HTML Brief + Recommendations]
-    D --> I[HTML Brief + Insights]
-    E --> J[JSON Results]
+flowchart TD
+    UP["User Prompt"] --> G
+
+    subgraph G["ReAct Gatherer Agent"]
+        direction TB
+        LLM["LLM decides next action"] --> TOOLS["MCP Tools\nget_catalogs, get_schemas\nget_tables, get_columns\nquery_data"]
+        TOOLS --> |"loop until done"| LLM
+    end
+
+    TOOLS <--> CDA["CData Connect AI\n(350+ sources)"]
+    G --> A["Analyst Node (LLM)\nStructured JSON: health_score,\nsignals, recommendations, risks"]
+    A --> R["Renderer Node\nJinja2 template → HTML\nDeterministic, no LLM"]
+    R --> OUT["output/*.html"]
 ```
 
-**How it Works:**
-1. Python app connects to CData Connect AI via MCP (HTTP Basic Auth)
-2. MCP server exposes data discovery and query tools
-3. LangGraph manages workflow state across four analysis nodes
-4. OpenAI-compatible LLM generates SQL from natural language and creates recommendations
-5. Professional HTML briefs are generated with embedded CSS
+**How it works:**
+1. A **ReAct Gatherer Agent** autonomously discovers schemas via MCP tools and gathers data through iterative tool calls
+2. An **Analyst node** makes a single LLM call to produce a structured JSON health assessment (score, signals, recommendations, risks)
+3. A **Renderer node** fills a Jinja2 template with the analysis and saves a styled HTML brief (deterministic, no LLM)
+4. **Schema caching** avoids redundant discovery on subsequent runs (24h TTL by default)
+5. Each node can be upgraded to a full agent by adding tools -- the pipeline is **multi-agent-ready**
 
-## Three Query Modes
+## Agent Pipeline Patterns
 
-### 1. Account Health Analysis
-```bash
-python src/main.py --account "Premium Auto Group Europe"
-```
-Runs a 4-node workflow: Gather Data -> Analyze Health -> Generate Recommendations -> Create Brief
+The gatherer uses LangGraph's `create_react_agent` -- a ReAct (Reason + Act) loop where the LLM decides which tool to call next based on results so far. This means the agent:
 
-**Output:** HTML brief with health score (Green/Yellow/Red), metrics, and AI recommendations
+- Discovers schemas dynamically (no hard-coded table names)
+- Adapts queries based on what it finds
+- Handles any CData-connected data source without code changes
 
-### 2. Natural Language Query
-```bash
-python src/main.py --nlquery "Show me the top 10 customers by revenue"
-python src/main.py --nlquery "All customers in the energy sector"
-python src/main.py --nlquery "How many open opportunities and total pipeline value?"
-```
-
-**Output:** HTML brief with query info, results table, and AI business insights
-
-### 3. Direct SQL Query
-```bash
-python src/main.py --query "SELECT TOP 10 [Name], [AnnualRevenue] FROM [Connection].[GoogleSheets].[demo_organization_account] ORDER BY [AnnualRevenue] DESC"
-```
-
-**Output:** Formatted table + JSON results
-
----
+The Analyst is a single structured LLM call (no tools), and the Renderer is fully deterministic (no LLM). Both are designed as extension points -- add tools to either node and it becomes a full agent. This separation keeps the pipeline predictable while giving the gatherer maximum flexibility.
 
 ## Quick Start
 
@@ -73,7 +50,7 @@ python src/main.py --query "SELECT TOP 10 [Name], [AnnualRevenue] FROM [Connecti
 
 - **Python 3.8+** ([Download](https://www.python.org/downloads/))
 - **CData Connect AI account** ([Free trial](https://www.cdata.com/ai/signup/))
-- **OpenAI API key** ([Get key](https://platform.openai.com/api-keys)) or any OpenAI-compatible LLM API
+- **OpenAI API key** ([Get key](https://platform.openai.com/api-keys)) or another supported LLM provider
 - **Git** ([Download](https://git-scm.com/))
 
 ### Installation
@@ -84,25 +61,6 @@ cd langgraph-customer-health-agent
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your credentials
-python src/main.py --nlquery "Show me the top 5 customers by revenue"
-```
-
-### Environment Variables
-
-```ini
-# OpenAI Configuration (or any OpenAI-compatible LLM)
-OPENAI_API_KEY=sk-proj-...
-OPENAI_API_URL=https://api.openai.com/v1/chat/completions
-OPENAI_MODEL=gpt-4o
-
-# CData Connect AI Configuration
-CDATA_EMAIL=your-email@company.com
-CDATA_PAT=your-personal-access-token-here
-
-# Data Source (google_sheets or salesforce)
-DATA_SOURCE=google_sheets
-GOOGLE_SHEETS_CONNECTION=LangGraph_Customer_Health_Agent_Google_Sheet
-SALESFORCE_CONNECTION=LangGraph_Customer_Health_Agent
 ```
 
 ### Set Up Sample Data
@@ -110,84 +68,150 @@ SALESFORCE_CONNECTION=LangGraph_Customer_Health_Agent
 1. Copy the [sample Google Sheet](https://docs.google.com/spreadsheets/d/1JpzuvwOlGp0FKDBxNgj6XgTDL2awuiZ3Ycs4_SnjJT8/edit?usp=sharing) (**File > Make a copy**, name it "demo_organization")
 2. In [CData Connect AI](https://cloud.cdata.com/), add a Google Sheets connection pointing to the copied sheet
 3. Create a Personal Access Token under Settings > Access Tokens
-4. Update `.env` with credentials
+4. Update `.env` with your credentials
 
----
+## Quick Run (Interactive)
 
-## LangGraph Workflow
+The easiest way to get started. The interactive runner handles setup, credential configuration, and running the agent:
 
-```mermaid
-graph LR
-    A[Node 1: Gather Data] --> B[Node 2: Analyze Health]
-    B --> C[Node 3: Generate Recs]
-    C --> D[Node 4: Create Brief]
-    style A fill:#e8f0fe
-    style B fill:#fce5cd
-    style C fill:#f4cccc
-    style D fill:#d9d2e9
+```bash
+python run.py
 ```
 
-| Node | Purpose |
-|------|---------|
-| **Gather Data** | Queries account details, opportunities, and support cases via MCP |
-| **Analyze Health** | Calculates health score (Green/Yellow/Red) from case volume and priority |
-| **Generate Recommendations** | LLM creates 5 actionable strategies based on health signals |
-| **Create Brief** | Generates professional HTML brief with embedded CSS |
+It provides a menu-driven interface to:
+1. **Setup wizard** -- configure CData credentials and choose an LLM provider (OpenAI, Gemini, DeepSeek)
+2. **Run health analysis** -- analyze a specific account with sample suggestions
+3. **Run open-ended query** -- ask any question about your data
+4. **Refresh schema cache** -- clear cached schemas for re-discovery
+5. **Check setup** -- verify credentials, test MCP connection, check dependencies
 
-### Health Score Logic
+> `rich` is auto-installed on first run if not already present.
 
-| Score | Criteria |
-|-------|----------|
-| **Green** | Healthy account, low case volume, active engagement |
-| **Yellow** | Warning signs: high-priority cases or declining engagement |
-| **Red** | At-risk: >3 high-priority cases or >10 open cases |
+## CLI Usage (Direct)
 
----
+### Account Health Analysis
+
+```bash
+python src/main.py --account "Premium Auto Group Europe"
+```
+
+Runs the full 3-node pipeline: discover schema, gather data, analyze health, render HTML brief.
+
+### Open-Ended Query
+
+```bash
+python src/main.py "Which industries have the highest average revenue?"
+python src/main.py "Show me all accounts with high priority open tickets"
+```
+
+Ask any question -- the ReAct agent figures out which tables and queries to run.
+
+### Options
+
+```bash
+python src/main.py --account "Acme Corp" --verbose        # DEBUG logging
+python src/main.py --account "Acme Corp" --refresh-schema # Force schema re-discovery
+```
+
+| Flag | Description |
+|------|-------------|
+| `--account NAME` | Shortcut for health analysis of a specific account |
+| `--refresh-schema` | Clear cached schema and re-discover on next run |
+| `--verbose` | Set log level to DEBUG for detailed output |
+
+## Multi-Provider LLM Support
+
+Configure the LLM provider via environment variables:
+
+| Provider | `LLM_PROVIDER` | `LLM_MODEL` (example) | Required package |
+|----------|----------------|----------------------|-----------------|
+| OpenAI | `openai` | `gpt-4o` | `langchain-openai` (included) |
+| Anthropic | `anthropic` | `claude-sonnet-4-20250514` | `langchain-anthropic` |
+| Google | `google` | `gemini-pro` | `langchain-google-genai` |
+| Ollama | `ollama` | `llama3` | `langchain-ollama` |
+
+Any OpenAI-compatible API (DeepSeek, Azure OpenAI, etc.) works with `LLM_PROVIDER=openai` and `OPENAI_API_BASE`.
+
+## Schema Caching
+
+On first run, the agent discovers schemas via MCP (catalogs, tables, columns). This metadata is cached to `~/.cache/langgraph-health/schema.json` with a 24-hour TTL.
+
+- **Cache hit:** Agent skips discovery and starts querying immediately
+- **Cache miss/expired:** Agent discovers schema, then caches for next run
+- **Force refresh:** `--refresh-schema` flag or set `SCHEMA_CACHE_TTL=0`
+- **Demo shortcut:** Set `CDATA_CATALOG` in `.env` to skip catalog discovery
+
+## Extending the Agent Pipeline
+
+Add custom agents by appending to the `PIPELINE` list in `src/graph.py`:
+
+```python
+PIPELINE = [
+    ("gather", gather_node),
+    ("analyze", analyze_node),
+    ("my_custom_step", my_custom_node),  # Add your agent here
+    ("render", render_node),
+]
+```
+
+Each node receives and returns the shared `AgentState` dict.
 
 ## Project Structure
 
 ```
 langgraph-customer-health-agent/
+├── run.py                     # Interactive runner (python run.py)
 ├── src/
-│   ├── config.py                    # Configuration & credentials
-│   ├── mcp_client_production.py     # CData MCP protocol client
-│   ├── tools.py                     # Data source query tools
-│   ├── langgraph_agent.py           # 4-node LangGraph workflow
-│   ├── nl_query.py                  # Natural language -> SQL
-│   └── main.py                      # CLI entry point (3 modes)
-├── output/                           # Generated briefs & results
+│   ├── config.py              # Configuration & get_llm() factory
+│   ├── state.py               # AgentState TypedDict
+│   ├── mcp_tools.py           # 5 @tool-decorated MCP wrappers
+│   ├── schema_cache.py        # TTL-based schema cache
+│   ├── logger.py              # Lightweight logging & stats
+│   ├── graph.py               # 3-node LangGraph pipeline
+│   ├── main.py                # CLI entry point
+│   ├── agents/
+│   │   ├── __init__.py
+│   │   ├── gatherer.py        # ReAct agent (schema discovery + queries)
+│   │   ├── analyst.py         # LLM node: structured JSON health analysis
+│   │   └── renderer.py        # Deterministic node: Jinja2 HTML brief renderer
+│   └── templates/
+│       └── brief.html         # Jinja2 HTML template
+├── output/                    # Generated briefs
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
 └── README.md
 ```
 
----
+## Environment Variables
 
-## Switching Data Sources
+```ini
+# Required
+CDATA_EMAIL=your-email@company.com
+CDATA_PAT=your-personal-access-token
+OPENAI_API_KEY=sk-proj-...
 
-```bash
-# Google Sheets (demo):
-DATA_SOURCE=google_sheets
+# LLM configuration
+LLM_PROVIDER=openai                 # openai, anthropic, google, ollama
+LLM_MODEL=gpt-4o                    # Model name for chosen provider
 
-# Salesforce (production):
-DATA_SOURCE=salesforce
+# Optional
+CDATA_CATALOG=ConnectionName         # Skip catalog discovery
+SCHEMA_CACHE_TTL=86400               # Cache TTL in seconds (default 24h)
+LOG_LEVEL=INFO                       # INFO or DEBUG
+MAX_ITERATIONS=15                    # Max ReAct tool-call loops
+OPENAI_API_BASE=https://...          # Custom API base URL
 ```
-
-No code changes needed. The agent dynamically resolves connection names and table names.
-
----
 
 ## Troubleshooting
 
 | Error | Solution |
 |-------|----------|
-| `Query returned no results` | Verify connection name, table names, and data existence |
-| `Failed to initialize MCP` | Check CDATA_EMAIL / CDATA_PAT in .env |
-| `Method not found` | Ensure connection is saved in CData Cloud with exact name |
-| `OpenAI API error` | Verify API key and check remaining credits |
-
----
+| `Query returned no results` | Verify connection name and data existence in CData Connect AI |
+| `MCP error` | Check CDATA_EMAIL / CDATA_PAT in .env |
+| `Unsupported LLM_PROVIDER` | Use openai, anthropic, google, or ollama |
+| `ImportError: langchain-...` | Install the package for your chosen LLM provider |
+| Agent loops too many times | Reduce MAX_ITERATIONS or set CDATA_CATALOG to narrow scope |
 
 ## Resources
 

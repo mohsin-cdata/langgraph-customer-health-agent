@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Health Brief &ndash; {{ title }}</title>
+    <style>
+        :root {
+            --dark: #1a202c;
+            --text: #2d3748;
+            --muted: #718096;
+            --light: #f7fafc;
+            --border: #e2e8f0;
+            --accent: #4c6ef5;
+            --green: #38a169;
+            --green-bg: #f0fff4;
+            --green-bg-deep: #c6f6d5;
+            --green-text: #22543d;
+            --yellow: #d69e2e;
+            --yellow-bg: #fffff0;
+            --yellow-bg-deep: #fefcbf;
+            --yellow-text: #744210;
+            --red: #e53e3e;
+            --red-bg: #fff5f5;
+            --red-bg-deep: #fed7d7;
+            --red-text: #742a2a;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #edf2f7;
+            padding: 32px;
+            color: var(--text);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .page {
+            max-width: 1080px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 6px 24px rgba(0,0,0,0.06);
+            overflow: hidden;
+        }
+
+        /* ---- Header ---- */
+        .header {
+            background: var(--dark);
+            color: #fff;
+            padding: 28px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 {
+            font-size: 1.55em;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        .header .account {
+            font-size: 1em;
+            color: #cbd5e0;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        /* ---- Score badge (stacked layout) ---- */
+        .score-badge {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .score-number {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.55em;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .score-meta {
+            text-align: left;
+        }
+        .score-meta .out-of {
+            font-size: 0.82em;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+        .score-meta .status {
+            font-size: 1.1em;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .badge-green .score-number  { background: var(--green-bg-deep); color: var(--green-text); }
+        .badge-green .status        { color: var(--green-bg-deep); }
+        .badge-yellow .score-number { background: var(--yellow-bg-deep); color: var(--yellow-text); }
+        .badge-yellow .status       { color: var(--yellow-bg-deep); }
+        .badge-red .score-number    { background: var(--red-bg-deep); color: var(--red-text); }
+        .badge-red .status          { color: var(--red-bg-deep); }
+
+        /* ---- Assessment banner ---- */
+        .assessment-bar {
+            background: var(--light);
+            border-bottom: 1px solid var(--border);
+            padding: 26px 40px;
+        }
+        .assessment-bar .label {
+            font-size: 0.78em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            margin-bottom: 10px;
+        }
+        .assessment-bar p {
+            font-size: 1.02em;
+            line-height: 1.75;
+            color: var(--text);
+        }
+
+        /* ---- KPI strip ---- */
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .kpi {
+            padding: 22px 24px;
+            text-align: center;
+            border-right: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+        .kpi:last-child { border-right: none; }
+        .kpi:hover { background: var(--light); }
+        .kpi-label {
+            font-size: 0.72em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-size: 1.6em;
+            font-weight: 700;
+            color: var(--dark);
+        }
+        .kpi.positive .kpi-value { color: var(--green); }
+        .kpi.negative .kpi-value { color: var(--red); }
+
+        /* ---- Two-column panels ---- */
+        .panels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+        .panel {
+            padding: 30px 40px;
+        }
+        .panel-left {
+            border-right: 1px solid var(--border);
+        }
+
+        /* ---- Section titles ---- */
+        .stitle {
+            font-size: 0.82em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--muted);
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        /* ---- Bullet lists ---- */
+        .blist {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 8px 0;
+        }
+        .blist li {
+            position: relative;
+            padding: 9px 12px 9px 24px;
+            font-size: 0.95em;
+            line-height: 1.65;
+            margin-bottom: 6px;
+            border-radius: 2px;
+            transition: background 0.15s;
+        }
+        .blist li:hover {
+            background: var(--light);
+        }
+        .blist li::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 17px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+        /* Highlighted keywords */
+        .blist li strong,
+        .assessment-bar p strong {
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        /* ---- Risk items (geometric) ---- */
+        .blist.risks li {
+            background: var(--red-bg);
+            border-left: 3px solid var(--red);
+            border-radius: 0;
+            padding-left: 22px;
+        }
+        .blist.risks li:hover {
+            background: var(--red-bg-deep);
+        }
+        .blist.risks li::before {
+            background: var(--red);
+            left: 8px;
+        }
+
+        /* ---- Opportunity items (geometric) ---- */
+        .blist.opps li {
+            background: var(--green-bg);
+            border-left: 3px solid var(--green);
+            border-radius: 0;
+            padding-left: 22px;
+        }
+        .blist.opps li:hover {
+            background: var(--green-bg-deep);
+        }
+        .blist.opps li::before {
+            background: var(--green);
+            left: 8px;
+        }
+
+        /* ---- Divider between sections in same column ---- */
+        .section-gap { margin-top: 28px; }
+
+        /* ---- Footer ---- */
+        .footer {
+            background: var(--light);
+            border-top: 1px solid var(--border);
+            padding: 14px 40px;
+            font-size: 0.82em;
+            color: var(--muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ---- Raw fallback ---- */
+        .raw-output {
+            background: var(--light);
+            border: 1px solid var(--border);
+            border-radius: 2px;
+            padding: 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 300px;
+            overflow-y: auto;
+            color: #4a5568;
+        }
+
+        /* ---- Print ---- */
+        @media print {
+            body { background: #fff; padding: 0; font-size: 13px; }
+            .page { box-shadow: none; border-radius: 0; }
+            .blist.risks li, .blist.opps li { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>Customer Health Brief</h1>
+            <div class="account">{{ title }}</div>
+        </div>
+        {% set label = analysis.get('health_label', 'Unknown') %}
+        {% set score = analysis.get('health_score', 0) %}
+        {% if label == 'Green' %}
+        <div class="score-badge badge-green">
+            <div class="score-number">{{ score }}</div>
+            <div class="score-meta">
+                <div class="out-of">out of 100</div>
+                <div class="status">Healthy</div>
+            </div>
+        </div>
+        {% elif label == 'Yellow' %}
+        <div class="score-badge badge-yellow">
+            <div class="score-number">{{ score }}</div>
+            <div class="score-meta">
+                <div class="out-of">out of 100</div>
+                <div class="status">At Risk</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="score-badge badge-red">
+            <div class="score-number">{{ score }}</div>
+            <div class="score-meta">
+                <div class="out-of">out of 100</div>
+                <div class="status">Critical</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Assessment -->
+    {% if analysis.get('reasoning') %}
+    <div class="assessment-bar">
+        <div class="label">Assessment</div>
+        <p>{{ analysis.reasoning }}</p>
+    </div>
+    {% endif %}
+
+    <!-- KPI strip -->
+    {% if analysis.get('signals') %}
+    <div class="kpi-strip">
+        {% for signal in analysis.signals %}
+        <div class="kpi {{ signal.get('impact', 'neutral') }}">
+            <div class="kpi-label">{{ signal.name }}</div>
+            <div class="kpi-value">{{ signal.value }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Two-column panels -->
+    <div class="panels">
+        <div class="panel panel-left">
+
+            {% if analysis.get('recommendations') %}
+            <div class="stitle">Recommendations</div>
+            <ul class="blist">
+                {% for rec in analysis.recommendations %}
+                <li>{{ rec }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            {% if analysis.get('opportunities') %}
+            <div class="section-gap"></div>
+            <div class="stitle">Opportunities</div>
+            <ul class="blist opps">
+                {% for opp in analysis.opportunities %}
+                <li>{{ opp }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+        </div>
+        <div class="panel">
+
+            {% if analysis.get('risks') %}
+            <div class="stitle">Risks</div>
+            <ul class="blist risks">
+                {% for risk in analysis.risks %}
+                <li>{{ risk }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            {% if analysis.get('raw_output') %}
+            <div class="section-gap"></div>
+            <div class="stitle">Raw Output</div>
+            <div class="raw-output">{{ analysis.raw_output }}</div>
+            {% endif %}
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <span>LangGraph Customer Health Agent</span>
+        <span>{{ timestamp }}</span>
+    </div>
+
+</div>
+</body>
+</html>

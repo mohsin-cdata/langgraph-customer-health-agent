@@ -2,49 +2,74 @@
 import os
 from dotenv import load_dotenv
 
-# Load environment variables (.env takes precedence over system env)
 load_dotenv(override=True)
 
-class Config:
-    """Central configuration class."""
+# CData Connect AI
+CDATA_EMAIL = os.getenv("CDATA_EMAIL")
+CDATA_PAT = os.getenv("CDATA_PAT")
+MCP_ENDPOINT = "https://mcp.cloud.cdata.com/mcp"
 
-    # CData Connect Cloud MCP
-    CDATA_EMAIL = os.getenv("CDATA_EMAIL")
-    CDATA_PAT = os.getenv("CDATA_PAT")
-    MCP_ENDPOINT = "https://mcp.cloud.cdata.com/mcp"
+# Optional: force a specific catalog for demos
+CDATA_CATALOG = os.getenv("CDATA_CATALOG")
 
-    # Data Source Connection (Salesforce or Google Sheets)
-    SALESFORCE_CONNECTION = os.getenv("SALESFORCE_CONNECTION", "LangGraph_Customer_Health_Agent")
-    GOOGLE_SHEETS_CONNECTION = os.getenv("GOOGLE_SHEETS_CONNECTION", "LangGraph_Customer_Health_Agent_Google_Sheet")
-    DATA_SOURCE = os.getenv("DATA_SOURCE", "google_sheets")  # "salesforce" or "google_sheets"
+# LLM configuration
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
 
-    # LLM API (OpenAI or any OpenAI-compatible API)
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+# Schema cache TTL in seconds (default 24h)
+SCHEMA_CACHE_TTL = int(os.getenv("SCHEMA_CACHE_TTL", "86400"))
 
-    # Output directory
-    OUTPUT_DIR = "output"
+# Log level
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
-    @classmethod
-    def validate(cls):
-        """Validate that all required environment variables are set."""
-        missing = []
+# Max ReAct iterations (recursion_limit = MAX_ITERATIONS * 2)
+MAX_ITERATIONS = int(os.getenv("MAX_ITERATIONS", "25"))
 
-        if not cls.CDATA_EMAIL:
-            missing.append("CDATA_EMAIL")
-        if not cls.CDATA_PAT:
-            missing.append("CDATA_PAT")
-        if not cls.OPENAI_API_KEY:
-            missing.append("OPENAI_API_KEY")
+# Output directory
+OUTPUT_DIR = "output"
 
-        if missing:
-            raise ValueError(
-                f"Missing required environment variables: {', '.join(missing)}\n"
-                "Please create a .env file based on .env.example"
+
+def get_llm(temperature: float = 0, model_override: str = None):
+    """Factory function to create an LLM instance based on LLM_PROVIDER.
+
+    Supports openai, anthropic, google, and ollama providers.
+    Install the corresponding langchain package for your chosen provider.
+    """
+    provider = LLM_PROVIDER.lower()
+    model = model_override or LLM_MODEL
+
+    if provider == "openai":
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError("Install langchain-openai: pip install langchain-openai")
+        return ChatOpenAI(model=model, temperature=temperature)
+
+    elif provider == "anthropic":
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except ImportError:
+            raise ImportError("Install langchain-anthropic: pip install langchain-anthropic")
+        return ChatAnthropic(model=model, temperature=temperature)
+
+    elif provider == "google":
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+        except ImportError:
+            raise ImportError(
+                "Install langchain-google-genai: pip install langchain-google-genai"
             )
+        return ChatGoogleGenerativeAI(model=model, temperature=temperature)
 
-        return True
+    elif provider == "ollama":
+        try:
+            from langchain_ollama import ChatOllama
+        except ImportError:
+            raise ImportError("Install langchain-ollama: pip install langchain-ollama")
+        return ChatOllama(model=model, temperature=temperature)
 
-# Validate on import
-Config.validate()
+    else:
+        raise ValueError(
+            f"Unsupported LLM_PROVIDER: '{provider}'. "
+            "Use openai, anthropic, google, or ollama."
+        )
